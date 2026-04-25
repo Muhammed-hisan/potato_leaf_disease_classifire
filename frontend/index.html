@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Potato Leaf Disease Classifier</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green-dark: #1a3a1f;
+    --green-mid: #2d5a35;
+    --green-light: #4a8c56;
+    --green-pale: #a8d5b0;
+    --cream: #f5f0e8;
+    --gold: #c9a84c;
+    --gold-light: #e8c97a;
+    --red: #c0392b;
+    --orange: #e67e22;
+    --white: #ffffff;
+    --text-dark: #1a1a1a;
+    --text-muted: #555;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    background-color: var(--green-dark);
+    color: var(--cream);
+    overflow-x: hidden;
+  }
+
+  /* ── Farm background ── */
+  .bg-scene {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+  }
+
+  .sky {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, #0d1f10 0%, #1a3a1f 40%, #2d5a35 100%);
+  }
+
+  /* Rolling hills */
+  .hill {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+  }
+  .hill svg { display: block; width: 100%; }
+
+  /* Potato rows */
+  .potato-rows {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 220px;
+  }
+  .row {
+    position: absolute;
+    height: 18px;
+    border-radius: 9px;
+    background: linear-gradient(90deg, #1a3a1f, #2d5a35 30%, #3a7044 50%, #2d5a35 70%, #1a3a1f);
+    left: -5%;
+    right: -5%;
+    opacity: 0.85;
+  }
+
+  /* Stars */
+  .stars { position: absolute; inset: 0; }
+  .star {
+    position: absolute;
+    background: white;
+    border-radius: 50%;
+    animation: twinkle 3s ease-in-out infinite;
+  }
+  @keyframes twinkle {
+    0%, 100% { opacity: 0.2; } 50% { opacity: 1; }
+  }
+
+  /* Fireflies */
+  .firefly {
+    position: absolute;
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: var(--gold-light);
+    animation: fly linear infinite;
+    opacity: 0;
+  }
+  @keyframes fly {
+    0%   { transform: translate(0,0);   opacity: 0; }
+    20%  { opacity: 0.9; }
+    80%  { opacity: 0.9; }
+    100% { transform: translate(var(--dx), var(--dy)); opacity: 0; }
+  }
+
+  /* ── Layout ── */
+  .page {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+
+  /* ── Header ── */
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+  .badge {
+    display: inline-block;
+    background: rgba(201,168,76,0.18);
+    border: 1px solid rgba(201,168,76,0.45);
+    color: var(--gold-light);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 20px;
+    margin-bottom: 1rem;
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 700;
+    color: var(--cream);
+    line-height: 1.15;
+    margin-bottom: 0.6rem;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+  }
+  h1 span { color: var(--gold); }
+  .subtitle {
+    font-size: 15px;
+    color: var(--green-pale);
+    font-weight: 300;
+    max-width: 420px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* ── Card ── */
+  .card {
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 24px;
+    width: 100%;
+    max-width: 560px;
+    padding: 2rem;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.4);
+  }
+
+  /* ── Drop zone ── */
+  .drop-zone {
+    border: 2px dashed rgba(201,168,76,0.4);
+    border-radius: 16px;
+    padding: 3rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+    min-height: 240px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    background: rgba(0,0,0,0.15);
+  }
+  .drop-zone.dragover {
+    border-color: var(--gold);
+    background: rgba(201,168,76,0.08);
+    transform: scale(1.01);
+  }
+  .drop-zone:hover {
+    border-color: rgba(201,168,76,0.65);
+    background: rgba(201,168,76,0.05);
+  }
+
+  .drop-icon {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(201,168,76,0.15);
+    border: 1.5px solid rgba(201,168,76,0.35);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px;
+    transition: transform 0.3s;
+  }
+  .drop-zone.dragover .drop-icon { transform: scale(1.15) rotate(-5deg); }
+
+  .drop-title {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--cream);
+  }
+  .drop-sub {
+    font-size: 13px;
+    color: var(--green-pale);
+  }
+
+  .browse-btn {
+    background: var(--gold);
+    color: var(--green-dark);
+    border: none;
+    border-radius: 30px;
+    padding: 9px 24px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-top: 0.25rem;
+  }
+  .browse-btn:hover { background: var(--gold-light); transform: translateY(-1px); }
+  .browse-btn:active { transform: translateY(0); }
+
+  #file-input { display: none; }
+
+  /* ── Preview ── */
+  .preview-wrap {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    width: 100%;
+  }
+  .preview-wrap.visible { display: flex; }
+
+  .preview-img {
+    width: 100%;
+    max-height: 260px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 1.5px solid rgba(255,255,255,0.12);
+  }
+
+  .change-btn {
+    background: transparent;
+    color: var(--green-pale);
+    border: 1px solid rgba(168,213,176,0.3);
+    border-radius: 20px;
+    padding: 6px 18px;
+    font-size: 12px;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .change-btn:hover { border-color: var(--green-pale); color: var(--cream); }
+
+  /* ── Analyze button ── */
+  .analyze-btn {
+    width: 100%;
+    margin-top: 1.25rem;
+    background: linear-gradient(135deg, var(--green-mid), var(--green-light));
+    color: white;
+    border: none;
+    border-radius: 14px;
+    padding: 15px;
+    font-size: 15px;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: all 0.25s;
+    letter-spacing: 0.3px;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    box-shadow: 0 4px 20px rgba(45,90,53,0.5);
+  }
+  .analyze-btn.visible { display: flex; }
+  .analyze-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(45,90,53,0.6); }
+  .analyze-btn:active { transform: translateY(0); }
+  .analyze-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+  /* spinner */
+  .spinner {
+    width: 18px; height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: none;
+  }
+  .spinner.visible { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Result ── */
+  .result-card {
+    display: none;
+    margin-top: 1.5rem;
+    border-radius: 16px;
+    padding: 1.5rem;
+    border: 1.5px solid;
+    animation: slideUp 0.4s ease;
+  }
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .result-card.visible { display: block; }
+
+  .result-card.healthy {
+    background: rgba(74,140,86,0.15);
+    border-color: rgba(74,140,86,0.45);
+  }
+  .result-card.disease {
+    background: rgba(192,57,43,0.12);
+    border-color: rgba(192,57,43,0.4);
+  }
+  .result-card.warning {
+    background: rgba(230,126,34,0.12);
+    border-color: rgba(230,126,34,0.4);
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 1rem;
+  }
+  .result-icon {
+    font-size: 32px;
+    line-height: 1;
+  }
+  .result-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.8px;
+    text-transform: uppercase;
+    color: var(--green-pale);
+    margin-bottom: 3px;
+  }
+  .result-name {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--cream);
+  }
+
+  .confidence-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .confidence-label { font-size: 12px; color: var(--green-pale); }
+  .confidence-val { font-size: 13px; font-weight: 500; color: var(--gold-light); }
+
+  .progress-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.1);
+    overflow: hidden;
+    margin-bottom: 1rem;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--gold), var(--gold-light));
+    transition: width 0.8s cubic-bezier(0.4,0,0.2,1);
+    width: 0%;
+  }
+
+  .scores-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 0.5rem;
+  }
+  .score-pill {
+    background: rgba(0,0,0,0.2);
+    border-radius: 10px;
+    padding: 8px 6px;
+    text-align: center;
+  }
+  .score-pill-name { font-size: 10px; color: var(--green-pale); margin-bottom: 3px; }
+  .score-pill-val { font-size: 14px; font-weight: 500; color: var(--cream); }
+
+  .tip-box {
+    margin-top: 1rem;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(0,0,0,0.2);
+    font-size: 13px;
+    color: var(--green-pale);
+    line-height: 1.55;
+  }
+  .tip-box strong { color: var(--cream); }
+
+  /* ── Error ── */
+  .error-msg {
+    display: none;
+    margin-top: 1rem;
+    padding: 12px 16px;
+    border-radius: 10px;
+    background: rgba(192,57,43,0.15);
+    border: 1px solid rgba(192,57,43,0.35);
+    color: #f5a09a;
+    font-size: 13px;
+  }
+  .error-msg.visible { display: block; }
+
+  /* ── Footer ── */
+  footer {
+    margin-top: 2.5rem;
+    text-align: center;
+    font-size: 12px;
+    color: rgba(168,213,176,0.45);
+    letter-spacing: 0.5px;
+  }
+</style>
+</head>
+<body>
+
+<!-- Animated background -->
+<div class="bg-scene">
+  <div class="sky"></div>
+  <div class="stars" id="stars"></div>
+
+  <!-- Hills SVG -->
+  <div class="hill">
+    <svg viewBox="0 0 1440 320" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+      <path fill="#0d2e12" fill-opacity="0.9"
+        d="M0,192L60,181.3C120,171,240,149,360,160C480,171,600,213,720,218.7C840,224,960,192,1080,176C1200,160,1320,160,1380,160L1440,160L1440,320L0,320Z"/>
+      <path fill="#122b16" fill-opacity="0.8"
+        d="M0,256L80,240C160,224,320,192,480,197.3C640,203,800,245,960,250.7C1120,256,1280,224,1360,208L1440,192L1440,320L0,320Z"/>
+      <path fill="#1a3a1f"
+        d="M0,288L120,277.3C240,267,480,245,720,245.3C960,245,1200,267,1320,277.3L1440,288L1440,320L0,320Z"/>
+    </svg>
+  </div>
+
+  <!-- Potato field rows -->
+  <div class="potato-rows" id="rows"></div>
+
+  <!-- Fireflies -->
+  <div id="fireflies"></div>
+</div>
+
+<!-- Page content -->
+<div class="page">
+  <header>
+    <div class="badge">🌿 AI-Powered Diagnosis</div>
+    <h1>Potato Leaf<br/><span>Disease Detector</span></h1>
+    <p class="subtitle">Upload a photo of a potato leaf and our model will instantly identify any disease present.</p>
+  </header>
+
+  <div class="card">
+    <!-- Drop zone -->
+    <div class="drop-zone" id="drop-zone">
+      <div class="drop-icon">🍃</div>
+      <p class="drop-title">Drop your leaf photo here</p>
+      <p class="drop-sub">PNG, JPG or JPEG supported</p>
+      <button class="browse-btn" onclick="document.getElementById('file-input').click()">Browse files</button>
+      <input type="file" id="file-input" accept="image/*"/>
+    </div>
+
+    <!-- Preview -->
+    <div class="preview-wrap" id="preview-wrap">
+      <img class="preview-img" id="preview-img" src="" alt="Leaf preview"/>
+      <button class="change-btn" onclick="resetAll()">↩ Choose different image</button>
+    </div>
+
+    <!-- Analyze button -->
+    <button class="analyze-btn" id="analyze-btn" onclick="analyze()">
+      <span id="btn-text">🔬 Analyze Leaf</span>
+      <div class="spinner" id="spinner"></div>
+    </button>
+
+    <!-- Error -->
+    <div class="error-msg" id="error-msg"></div>
+
+    <!-- Result -->
+    <div class="result-card" id="result-card">
+      <div class="result-header">
+        <div class="result-icon" id="result-icon">🌿</div>
+        <div>
+          <div class="result-label">Diagnosis</div>
+          <div class="result-name" id="result-name">—</div>
+        </div>
+      </div>
+      <div class="confidence-row">
+        <span class="confidence-label">Confidence</span>
+        <span class="confidence-val" id="conf-val">—</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+      <div class="scores-grid" id="scores-grid"></div>
+      <div class="tip-box" id="tip-box"></div>
+    </div>
+  </div>
+
+  <footer>Potato Leaf Disease Classifier &nbsp;·&nbsp; Deep Learning Project</footer>
+</div>
+
+<script>
+const API_URL = "http://localhost:8000/predict";
+
+const tips = {
+  "Early Blight": "<strong>Early Blight detected.</strong> Caused by <em>Alternaria solani</em>. Remove affected leaves, apply copper-based fungicide, and avoid overhead watering.",
+  "Late Blight":  "<strong>Late Blight detected.</strong> Caused by <em>Phytophthora infestans</em>. Act fast — apply fungicide immediately and remove heavily infected plants to prevent spread.",
+  "Healthy":      "<strong>Your plant looks healthy!</strong> Continue regular monitoring, proper watering, and crop rotation to maintain plant health."
+};
+
+const icons = { "Early Blight": "🟡", "Late Blight": "🔴", "Healthy": "✅" };
+const classes = { "Early Blight": "warning", "Late Blight": "disease", "Healthy": "healthy" };
+
+let selectedFile = null;
+
+// ── Drag & drop ──
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadFile(f);
+});
+
+document.getElementById('file-input').addEventListener('change', e => {
+  if (e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+function loadFile(file) {
+  selectedFile = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('preview-img').src = ev.target.result;
+    document.getElementById('drop-zone').style.display = 'none';
+    document.getElementById('preview-wrap').classList.add('visible');
+    document.getElementById('analyze-btn').classList.add('visible');
+    document.getElementById('result-card').classList.remove('visible');
+    document.getElementById('error-msg').classList.remove('visible');
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetAll() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('drop-zone').style.display = 'flex';
+  document.getElementById('preview-wrap').classList.remove('visible');
+  document.getElementById('analyze-btn').classList.remove('visible');
+  document.getElementById('result-card').classList.remove('visible');
+  document.getElementById('error-msg').classList.remove('visible');
+}
+
+async function analyze() {
+  if (!selectedFile) return;
+
+  const btn = document.getElementById('analyze-btn');
+  const spinner = document.getElementById('spinner');
+  const btnText = document.getElementById('btn-text');
+  const errMsg = document.getElementById('error-msg');
+
+  btn.disabled = true;
+  spinner.classList.add('visible');
+  btnText.textContent = 'Analyzing…';
+  errMsg.classList.remove('visible');
+  document.getElementById('result-card').classList.remove('visible');
+
+  try {
+    const form = new FormData();
+    form.append('file', selectedFile);
+
+    const res = await fetch(API_URL, { method: 'POST', body: form });
+    if (!res.ok) throw new Error(`Server error: ${res.status}`);
+
+    const data = await res.json();
+    showResult(data);
+  } catch (err) {
+    errMsg.textContent = '⚠️ Could not connect to the backend. Make sure uvicorn is running on port 8000.';
+    errMsg.classList.add('visible');
+  } finally {
+    btn.disabled = false;
+    spinner.classList.remove('visible');
+    btnText.textContent = '🔬 Analyze Leaf';
+  }
+}
+
+function showResult(data) {
+  const pred = data.prediction;
+  const conf = data.confidence;
+  const scores = data.all_scores;
+
+  const rc = document.getElementById('result-card');
+  rc.className = 'result-card visible ' + (classes[pred] || 'healthy');
+
+  document.getElementById('result-icon').textContent = icons[pred] || '🌿';
+  document.getElementById('result-name').textContent = pred;
+  document.getElementById('conf-val').textContent = conf.toFixed(1) + '%';
+
+  setTimeout(() => {
+    document.getElementById('progress-fill').style.width = conf + '%';
+  }, 50);
+
+  // Score pills
+  const grid = document.getElementById('scores-grid');
+  grid.innerHTML = '';
+  if (scores) {
+    Object.entries(scores).forEach(([cls, pct]) => {
+      const pill = document.createElement('div');
+      pill.className = 'score-pill';
+      pill.innerHTML = `<div class="score-pill-name">${cls}</div><div class="score-pill-val">${pct.toFixed(1)}%</div>`;
+      grid.appendChild(pill);
+    });
+  }
+
+  document.getElementById('tip-box').innerHTML = tips[pred] || '';
+  rc.classList.add('visible');
+}
+
+// ── Background: stars ──
+const starsEl = document.getElementById('stars');
+for (let i = 0; i < 80; i++) {
+  const s = document.createElement('div');
+  s.className = 'star';
+  const size = Math.random() * 2.5 + 0.5;
+  s.style.cssText = `
+    width:${size}px; height:${size}px;
+    top:${Math.random()*60}%; left:${Math.random()*100}%;
+    animation-delay:${Math.random()*4}s;
+    animation-duration:${2+Math.random()*3}s;
+  `;
+  starsEl.appendChild(s);
+}
+
+// ── Background: potato rows ──
+const rowsEl = document.getElementById('rows');
+for (let i = 0; i < 7; i++) {
+  const r = document.createElement('div');
+  r.className = 'row';
+  r.style.cssText = `bottom:${i*28}px; opacity:${0.5+i*0.07};`;
+  rowsEl.appendChild(r);
+}
+
+// ── Background: fireflies ──
+const ffEl = document.getElementById('fireflies');
+for (let i = 0; i < 18; i++) {
+  const f = document.createElement('div');
+  f.className = 'firefly';
+  const dx = (Math.random()-0.5)*200;
+  const dy = (Math.random()-0.5)*200;
+  f.style.cssText = `
+    left:${10+Math.random()*80}%; top:${30+Math.random()*60}%;
+    --dx:${dx}px; --dy:${dy}px;
+    animation-duration:${4+Math.random()*6}s;
+    animation-delay:${Math.random()*6}s;
+  `;
+  ffEl.appendChild(f);
+}
+</script>
+</body>
+</html>
